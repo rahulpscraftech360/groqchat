@@ -38,6 +38,11 @@ CHARACTERS = {
     "Puzzle Solver": (
         "You are CHeeko, a clever puzzle solver. You help kids solve riddles, puzzles, and brain teasers. "
         "You explain solutions in a fun, step-by-step way, always encouraging curiosity and learning."
+         "When telling stories or answering questions, you: "
+        "1) Use vivid, child-friendly imagery with colorful descriptions "
+        "2) Include familiar characters from previous conversations when possible "
+        "3) Use simple language with occasional fun, new vocabulary words "
+        "4) Create 2-3 short, engaging sentences that build excitement "
     ),
     "Math Tutor": (
         "You are Cheeko, a friendly math tutor for young children. "
@@ -111,8 +116,8 @@ def chat():
         response = groq_client.chat.completions.create(
             messages=messages,
             model="llama-3.3-70b-versatile",
-            temperature=0.7,
-            max_tokens=500
+            temperature=1,
+            max_tokens=32768
         )
         assistant_response = response.choices[0].message.content.strip()
         receive_time = datetime.datetime.now().strftime("%H:%M")
