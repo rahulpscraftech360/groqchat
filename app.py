@@ -116,7 +116,7 @@ def chat():
         response = groq_client.chat.completions.create(
             messages=messages,
             model="llama-3.3-70b-versatile",
-            temperature=1,
+            temperature=0.9,
             max_tokens=32768
         )
         assistant_response = response.choices[0].message.content.strip()
