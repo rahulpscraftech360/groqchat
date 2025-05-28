@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title> Cheeko</title>
+    <title>Grok Chat</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-[#ECE5DD] min-h-screen flex flex-col">
     <header class="bg-[#075E54] text-white p-4 flex items-center">
-        <h1 class="text-xl font-bold"> Chat to Cheeko</h1>
+        <h1 class="text-xl font-bold">Grok Chat</h1>
     </header>
     <div class="p-4 bg-[#ECE5DD]">
         <label for="character-select" class="text-sm font-semibold text-gray-700">Choose Character:</label>
@@ -17,6 +17,13 @@
                 <option value="{{ char }}" {% if char == session.character %}selected{% endif %}>{{ char }}</option>
             {% endfor %}
         </select>
+    </div>
+    <div class="p-4 bg-[#ECE5DD]">
+        <button id="toggle-prompt" class="text-sm font-semibold text-[#075E54] hover:underline">Show/Hide Character Prompt</button>
+        <div id="prompt-container" class="hidden mt-2">
+            <textarea id="prompt-textarea" class="w-full p-2 border rounded-lg bg-white text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#075E54]" rows="5">{{ session.prompts[session.character] }}</textarea>
+            <button id="save-prompt" class="mt-2 p-2 bg-[#075E54] text-white rounded-lg hover:bg-[#064e45]">Save Prompt</button>
+        </div>
     </div>
     <div id="chat-container" class="flex-1 p-4 overflow-y-auto">
         {% for msg in session.histories[session.character] %}
@@ -42,9 +49,53 @@
         const sendButton = document.getElementById('send-button');
         const clearButton = document.getElementById('clear-button');
         const characterSelect = document.getElementById('character-select');
+        const togglePromptButton = document.getElementById('toggle-prompt');
+        const promptContainer = document.getElementById('prompt-container');
+        const promptTextarea = document.getElementById('prompt-textarea');
+        const savePromptButton = document.getElementById('save-prompt');
 
         // Scroll to bottom on load
         chatContainer.scrollTop = chatContainer.scrollHeight;
+
+        // Toggle prompt visibility
+        togglePromptButton.addEventListener('click', () => {
+            promptContainer.classList.toggle('hidden');
+            togglePromptButton.textContent = promptContainer.classList.contains('hidden') ? 'Show/Hide Character Prompt' : 'Hide Character Prompt';
+        });
+
+        // Save prompt
+        savePromptButton.addEventListener('click', async () => {
+            const prompt = promptTextarea.value.trim();
+            if (!prompt) {
+                alert('Prompt cannot be empty');
+                return;
+            }
+
+            try {
+                const response = await fetch('/update_prompt', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt })
+                });
+
+                if (!response.ok) {
+                    const text = await response.text();
+                    console.error('Update prompt response:', response.status, text);
+                    throw new Error(`HTTP ${response.status}: ${text}`);
+                }
+
+                const data = await response.json();
+                if (data.error) {
+                    alert('Error: ' + data.error);
+                    return;
+                }
+
+                alert('Prompt updated successfully!');
+            } catch (error) {
+                console.error('Save prompt error:', error);
+                alert('Error saving prompt: ' + error.message);
+            }
+        });
 
         sendButton.addEventListener('click', sendMessage);
         messageInput.addEventListener('keypress', (e) => {
@@ -65,8 +116,14 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ message, character })
                 });
-                const data = await response.json();
 
+                if (!response.ok) {
+                    const text = await response.text();
+                    console.error('Chat response:', response.status, text);
+                    throw new Error(`HTTP ${response.status}: ${text}`);
+                }
+
+                const data = await response.json();
                 if (data.error) {
                     alert('Error: ' + data.error);
                     return;
@@ -96,9 +153,13 @@
                 `;
                 chatContainer.appendChild(assistantDiv);
 
+                // Update prompt display
+                promptTextarea.value = data.prompt;
+
                 // Scroll to bottom
                 chatContainer.scrollTop = chatContainer.scrollHeight;
             } catch (error) {
+                console.error('Send message error:', error);
                 alert('Error: ' + error.message);
             } finally {
                 messageInput.value = '';
@@ -116,11 +177,18 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ character })
                 });
-                const data = await response.json();
 
+                if (!response.ok) {
+                    const text = await response.text();
+                    console.error('Set character response:', response.status, text);
+                    throw new Error(`HTTP ${response.status}: ${text}`);
+                }
+
+                const data = await response.json();
                 if (data.error) {
+                    console.error('Server error:', data.error);
                     alert('Error: ' + data.error);
-                    characterSelect.value = '{{ session.character }}'; // Revert on error
+                    characterSelect.value = '{{ session.character }}';
                     return;
                 }
 
@@ -141,19 +209,40 @@
                     chatContainer.appendChild(div);
                 });
 
+                // Update prompt display
+                promptTextarea.value = data.prompt;
+
                 // Scroll to bottom
                 chatContainer.scrollTop = chatContainer.scrollHeight;
             } catch (error) {
+                console.error('Character change error:', error);
                 alert('Error changing character: ' + error.message);
-                characterSelect.value = '{{ session.character }}'; // Revert on error
+                characterSelect.value = '{{ session.character }}';
             }
         });
 
         clearButton.addEventListener('click', async () => {
             try {
-                await fetch('/clear', { method: 'POST' });
+                const response = await fetch('/clear', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                if (!response.ok) {
+                    const text = await response.text();
+                    console.error('Clear response:', response.status, text);
+                    throw new Error(`HTTP ${response.status}: ${text}`);
+                }
+
+                const data = await response.json();
+                if (data.error) {
+                    alert('Error: ' + data.error);
+                    return;
+                }
+
                 chatContainer.innerHTML = '';
             } catch (error) {
+                console.error('Clear history error:', error);
                 alert('Error clearing history: ' + error.message);
             }
         });
