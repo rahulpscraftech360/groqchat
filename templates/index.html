@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grok Chat</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-[#ECE5DD] min-h-screen flex flex-col">
+    <header class="bg-[#075E54] text-white p-4 flex items-center">
+        <h1 class="text-xl font-bold">Grok Chat</h1>
+    </header>
+    <div id="chat-container" class="flex-1 p-4 overflow-y-auto">
+        {% for msg in session.history %}
+            <div class="flex mb-2 {{ 'justify-end' if msg.sender == 'user' else 'justify-start' }}">
+                <div class="max-w-xs p-3 rounded-lg shadow {{ 'bg-[#DCF8C6]' if msg.sender == 'user' else 'bg-white' }} text-gray-800">
+                    <p class="text-sm">{{ msg.text }}</p>
+                    <p class="text-xs text-gray-500 text-right">{{ msg.timestamp }}</p>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+    <div class="p-4 bg-white flex items-center">
+        <input id="message-input" type="text" placeholder="Type a message..." class="flex-1 p-2 border rounded-full focus:outline-none focus:ring-2 focus:ring-[#075E54]">
+        <button id="send-button" class="ml-2 p-2 bg-[#075E54] text-white rounded-full hover:bg-[#064e45]">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
+        </button>
+        <button id="clear-button" class="ml-2 p-2 bg-red-600 text-white rounded-full hover:bg-red-700">Clear</button>
+    </div>
+    <script>
+        const chatContainer = document.getElementById('chat-container');
+        const messageInput = document.getElementById('message-input');
+        const sendButton = document.getElementById('send-button');
+        const clearButton = document.getElementById('clear-button');
+
+        // Scroll to bottom on load
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+
+        sendButton.addEventListener('click', sendMessage);
+        messageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendMessage();
+        });
+
+        async function sendMessage() {
+            const message = messageInput.value.trim();
+            if (!message) return;
+
+            sendButton.disabled = true;
+            messageInput.disabled = true;
+
+            try {
+                const response = await fetch('/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message })
+                });
+                const data = await response.json();
+
+                if (data.error) {
+                    alert('Error: ' + data.error);
+                    return;
+                }
+
+                // Add user message
+                const userDiv = document.createElement('div');
+                userDiv.className = 'flex justify-end mb-2';
+                userDiv.innerHTML = `
+                    <div class="max-w-xs p-3 rounded-lg shadow bg-[#DCF8C6] text-gray-800">
+                        <p class="text-sm">${data.user_message.text}</p>
+                        <p class="text-xs text-gray-500 text-right">${data.user_message.timestamp}</p>
+                    </div>
+                `;
+                chatContainer.appendChild(userDiv);
+
+                // Add assistant message
+                const assistantDiv = document.createElement('div');
+                assistantDiv.className = 'flex justify-start mb-2';
+                assistantDiv.innerHTML = `
+                    <div class="max-w-xs p-3 rounded-lg shadow bg-white text-gray-800">
+                        <p class="text-sm">${data.assistant_message.text}</p>
+                        <p class="text-xs text-gray-500 text-right">${data.assistant_message.timestamp}</p>
+                    </div>
+                `;
+                chatContainer.appendChild(assistantDiv);
+
+                // Scroll to bottom
+                chatContainer.scrollTop = chatContainer.scrollHeight;
+            } catch (error) {
+                alert('Error: ' + error.message);
+            } finally {
+                messageInput.value = '';
+                messageInput.disabled = false;
+                sendButton.disabled = false;
+                messageInput.focus();
+            }
+        }
+
+        clearButton.addEventListener('click', async () => {
+            try {
+                await fetch('/clear', { method: 'POST' });
+                chatContainer.innerHTML = '';
+            } catch (error) {
+                alert('Error clearing history: ' + error.message);
+            }
+        });
+    </script>
+</body>
+</html>
